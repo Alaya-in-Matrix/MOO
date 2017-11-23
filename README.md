@@ -12,5 +12,5 @@ Constrained multi-objective opitimization using a modified NSGA-II
 
 ## Dependencies
 
-- Eigen
+- Eigen(3.3)
 - CMake
