@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.2.1)
-project(conmo)
+project(moo)
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE debug)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g")
@@ -13,16 +13,16 @@ if(EIGEN_INC_DIR)
     include_directories(${EIGEN_INC_DIR})
 endif()
 
-set(SRC CONMO.cpp)
-set(CONMO_LIB conmo)
-add_library(${CONMO_LIB} ${SRC})
+set(SRC MOO.cpp)
+set(MOO_LIB moo)
+add_library(${MOO_LIB} ${SRC})
 
 set(TEST_SRC test.cpp)
-set(TEST_EXE conmo_test)
+set(TEST_EXE moo_test)
 add_executable(${TEST_EXE} ${TEST_SRC})
-target_link_libraries(${TEST_EXE} ${CONMO_LIB})
+target_link_libraries(${TEST_EXE} ${MOO_LIB})
 
-set_property(TARGET ${TEST_EXE} ${CONMO_LIB} PROPERTY CXX_STANDARD 11)
+set_property(TARGET ${TEST_EXE} ${MOO_LIB} PROPERTY CXX_STANDARD 11)
 
 enable_testing()
 add_test(MyTest ${TEST_EXE})
@@ -46,7 +46,7 @@ endif()
 
 
 message(STATUS "Install prefix: ${CMAKE_INSTALL_PREFIX}")
-install(TARGETS ${CONMO_LIB}
+install(TARGETS ${MOO_LIB}
     RUNTIME DESTINATION bin
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib)
