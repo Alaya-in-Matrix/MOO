@@ -31,9 +31,13 @@ protected:
     Eigen::VectorXd _run_func(const Eigen::VectorXd&); // wrapper of _func
     Eigen::MatrixXd _run_func_batch(const Eigen::MatrixXd&); // wrapper of _func
     Eigen::MatrixXd _rand_matrix(const Eigen::VectorXd& lb, const Eigen::VectorXd& ub, size_t n);
-    bool _compare(const Eigen::VectorXd& obj1, const Eigen::VectorXd& obj2) const;
-    std::vector<size_t> _nth_element(const Eigen::MatrixXd& objs, size_t) const;
+
+    bool _dominate(const Eigen::VectorXd& obj1, const Eigen::VectorXd& obj2) const;
     std::vector<size_t> _extract_pf(const Eigen::MatrixXd&) const;
+    Eigen::VectorXi _dom_rank(const Eigen::MatrixXd& objs) const;
+    Eigen::VectorXd _crowding_dist(const Eigen::MatrixXd& objs, const Eigen::VectorXi& ranks) const;
+    Eigen::VectorXd _front_crowding_dist(const Eigen::MatrixXd&) const;
+    std::vector<size_t> _nth_element(const Eigen::MatrixXd& objs, size_t) const;
 
 public:
     typedef std::function<Eigen::VectorXd(const Eigen::VectorXd&)> ObjF;
