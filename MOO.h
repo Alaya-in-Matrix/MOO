@@ -53,6 +53,12 @@ public:
     Eigen::MatrixXd pareto_set() const;
     Eigen::MatrixXd pareto_front() const;
 
+    Eigen::MatrixXd dbx() const;
+    Eigen::MatrixXd dby() const;
+    std::vector<size_t> nth_element(size_t) const;
+    std::vector<size_t> sort() const;
+    size_t best() const;
+
 private:
     ObjF _func;
 };
