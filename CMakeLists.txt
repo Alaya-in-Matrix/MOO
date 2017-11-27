@@ -9,9 +9,11 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 # One warning from when compiling Eigen headers
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations")
 
-if(EIGEN_INC_DIR)
-    include_directories(${EIGEN_INC_DIR})
-endif()
+# if(EIGEN_INC_DIR)
+#     include_directories(${EIGEN_INC_DIR})
+# endif()
+find_package(Eigen3 3.3 REQUIRED NO_MODULE)
+include_directories(${EIGEN3_INCLUDE_DIR})
 
 set(SRC MOO.cpp)
 set(MOO_LIB moo)
