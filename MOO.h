@@ -6,12 +6,13 @@ class MOO
 {
 protected:
     // if _record_all is set to true, the all the evaluated points would be saved to calculate a pareto front
-    bool _record_all = false;
-    size_t _np       = 100;
-    size_t _gen      = 200;
-    double _f        = 0.8;
-    double _cr       = 0.8;
-    size_t _seed     = std::random_device{}();
+    bool _record_all     = false;
+    size_t _np           = 100;
+    size_t _gen          = 200;
+    double _f            = 0.8;
+    double _cr           = 0.8;
+    size_t _seed         = std::random_device{}();
+    size_t _eval_counter = 0;
     const size_t _dim;
     const size_t _num_obj;
     const Eigen::VectorXd _lb;

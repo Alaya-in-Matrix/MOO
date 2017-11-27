@@ -24,6 +24,11 @@ void MOO::set_seed(size_t seed)
 size_t MOO::get_seed() const { return _seed; }
 void MOO::moo()
 {
+    if(_record_all)
+    {
+        _sampled_x = MatrixXd::Zero(_dim,     _np * _gen);
+        _sampled_y = MatrixXd::Zero(_num_obj, _np * _gen);
+    }
     _pop_x = _rand_matrix(_lb, _ub, _np);
     _pop_y = _run_func_batch(_pop_x);
     for (size_t i = 0; i < _gen; ++i)
@@ -108,11 +113,10 @@ Eigen::VectorXd MOO::_run_func(const Eigen::VectorXd& param)  // wrapper of _fun
     assert((size_t)evaluated.size() == _num_obj);
     if (_record_all)
     {
-        _sampled_x.conservativeResize(Eigen::NoChange, _sampled_x.cols() + 1);
-        _sampled_y.conservativeResize(Eigen::NoChange, _sampled_y.cols() + 1);
-        _sampled_x.rightCols(1) = param;
-        _sampled_y.rightCols(1) = evaluated;
+        _sampled_x.col(_eval_counter) = param;
+        _sampled_y.col(_eval_counter) = evaluated;
     }
+    ++_eval_counter;
     return evaluated;
 }
 Eigen::MatrixXd MOO::_run_func_batch(const Eigen::MatrixXd& params)  // wrapper of _func
