@@ -26,8 +26,8 @@ void MOO::moo()
 {
     if(_record_all)
     {
-        _sampled_x = MatrixXd::Zero(_dim,     _np * _gen);
-        _sampled_y = MatrixXd::Zero(_num_obj, _np * _gen);
+        _sampled_x = MatrixXd::Zero(_dim,     _np * (1+_gen));
+        _sampled_y = MatrixXd::Zero(_num_obj, _np * (1+_gen));
     }
     _pop_x = _rand_matrix(_lb, _ub, _np);
     _pop_y = _run_func_batch(_pop_x);
