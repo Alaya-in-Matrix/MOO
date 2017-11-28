@@ -1,6 +1,7 @@
 #include "MOO.h"
 #include <Eigen/Dense>
 #include <limits>
+#include <iostream>
 using namespace std;
 using namespace Eigen;
 MOO::MOO(MOO::ObjF f, size_t no, const VectorXd& lb, const VectorXd& ub)
@@ -8,8 +9,10 @@ MOO::MOO(MOO::ObjF f, size_t no, const VectorXd& lb, const VectorXd& ub)
 {
     assert(lb.size() == ub.size() and (lb.array() < ub.array()).all());
     _engine = mt19937_64(_seed);
-    _sampled_x = MatrixXd(_dim, 0);
-    _sampled_y = MatrixXd(_num_obj, 0);
+    // _sampled_x = MatrixXd(_dim, 0);
+    // _sampled_y = MatrixXd(_num_obj, 0);
+    _elitist_x = MatrixXd(_dim, 0);
+    _elitist_y = MatrixXd(_num_obj, 0);
 }
 void MOO::set_np(size_t np) { _np = np; }
 void MOO::set_gen(size_t gen) { _gen = gen; }
@@ -24,11 +27,11 @@ void MOO::set_seed(size_t seed)
 size_t MOO::get_seed() const { return _seed; }
 void MOO::moo()
 {
-    if(_record_all)
-    {
-        _sampled_x = MatrixXd::Zero(_dim,     _np * (1+_gen));
-        _sampled_y = MatrixXd::Zero(_num_obj, _np * (1+_gen));
-    }
+    // if(_record_all)
+    // {
+    //     _sampled_x = MatrixXd::Zero(_dim,     _np * (1+_gen));
+    //     _sampled_y = MatrixXd::Zero(_num_obj, _np * (1+_gen));
+    // }
     _pop_x = _rand_matrix(_lb, _ub, _np);
     _pop_y = _run_func_batch(_pop_x);
     for (size_t i = 0; i < _gen; ++i)
@@ -42,19 +45,34 @@ void MOO::moo()
         merged_x << _pop_x, children_x;
         merged_y << _pop_y, children_y;
 
+        _ranks        = _dom_rank(merged_y);
+        _crowding_vol = _crowding_dist(merged_y, _ranks);
         const vector<size_t> idxs = _nth_element(merged_y, _np);
         _pop_x = _slice_matrix(merged_x, idxs).leftCols(_np);
         _pop_y = _slice_matrix(merged_y, idxs).leftCols(_np);
+        if(_record_all)
+        {
+            vector<size_t> best_rank_indices;
+            for(size_t i = _np; i < 2 * _np; ++i)
+            {
+                if(_ranks(i) == 0)
+                    best_rank_indices.push_back(i - _np);
+            }
+            _elitist_x.conservativeResize(Eigen::NoChange, _elitist_x.cols() + best_rank_indices.size());
+            _elitist_y.conservativeResize(Eigen::NoChange, _elitist_y.cols() + best_rank_indices.size());
+            _elitist_x.rightCols(best_rank_indices.size()) = _slice_matrix(children_x, best_rank_indices);
+            _elitist_y.rightCols(best_rank_indices.size()) = _slice_matrix(children_y, best_rank_indices);
+        }
     }
 }
 MatrixXd MOO::pareto_set() const
 {
-    return _record_all ? _slice_matrix(_sampled_x, _extract_pf(_sampled_y))
+    return _record_all ? _slice_matrix(_elitist_x, _extract_pf(_elitist_y))
                        : _slice_matrix(_pop_x, _extract_pf(_pop_y));
 }
 MatrixXd MOO::pareto_front() const
 {
-    return _record_all ? _slice_matrix(_sampled_y, _extract_pf(_sampled_y))
+    return _record_all ? _slice_matrix(_elitist_y, _extract_pf(_elitist_y))
                        : _slice_matrix(_pop_y, _extract_pf(_pop_y));
 }
 
@@ -111,11 +129,11 @@ Eigen::VectorXd MOO::_run_func(const Eigen::VectorXd& param)  // wrapper of _fun
     VectorXd evaluated = _func(param);
     assert((size_t)param.size() == _dim);
     assert((size_t)evaluated.size() == _num_obj);
-    if (_record_all)
-    {
-        _sampled_x.col(_eval_counter) = param;
-        _sampled_y.col(_eval_counter) = evaluated;
-    }
+    // if (_record_all)
+    // {
+    //     _sampled_x.col(_eval_counter) = param;
+    //     _sampled_y.col(_eval_counter) = evaluated;
+    // }
     ++_eval_counter;
     return evaluated;
 }
@@ -255,25 +273,23 @@ VectorXd MOO::_front_crowding_dist(const MatrixXd& front_objs) const
 }
 std::vector<size_t> MOO::_nth_element(const MatrixXd& objs, size_t n) const
 {
-    const VectorXi ranks    = _dom_rank(objs);
-    const VectorXd crow_vol = _crowding_dist(objs, ranks);
     vector<size_t> indices  = _seq_index(objs.cols());
     auto cmp = [&](const size_t i1, size_t i2) -> bool {
-        return ranks(i1) < ranks(i2) or (ranks(i1) == ranks(i2) and crow_vol(i1) > crow_vol(i2));
+        return _ranks(i1) < _ranks(i2) or (_ranks(i1) == _ranks(i2) and _crowding_vol(i1) > _crowding_vol(i2));
     };
     std::nth_element(indices.begin(), indices.begin() + n, indices.end(), cmp);
     return indices;
 }
-MatrixXd MOO::dbx() const { return _record_all ? _sampled_x : _pop_x; }
-MatrixXd MOO::dby() const { return _record_all ? _sampled_y : _pop_y; }
+MatrixXd MOO::dbx() const { return _record_all ? _elitist_x : _pop_x; }
+MatrixXd MOO::dby() const { return _record_all ? _elitist_y : _pop_y; }
 vector<size_t> MOO::nth_element(size_t n) const
 {
-    const MatrixXd& dby = _record_all ? _sampled_y : _pop_y; 
+    const MatrixXd& dby = _record_all ? _elitist_y : _pop_y; 
     return _nth_element(dby, n);
 }
 vector<size_t> MOO::sort() const
 {
-    const MatrixXd& dby = _record_all ? _sampled_y : _pop_y; 
+    const MatrixXd& dby = _record_all ? _elitist_y : _pop_y; 
     const VectorXi ranks    = _dom_rank(dby);
     const VectorXd crow_vol = _crowding_dist(dby, ranks);
     vector<size_t> indices  = _seq_index(dby.cols());

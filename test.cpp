@@ -59,6 +59,7 @@ int main()
     mo.set_np(100);
     mo.set_record(true);
     mo.moo();
+    cout << "MOO finished" << endl;
     cout << mo.pareto_front() << endl;
     return EXIT_SUCCESS;
 }

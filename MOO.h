@@ -20,10 +20,12 @@ protected:
 
     Eigen::MatrixXd _pop_x;
     Eigen::MatrixXd _pop_y;
-    Eigen::MatrixXd _sampled_x;
-    Eigen::MatrixXd _sampled_y;
+    Eigen::MatrixXd _elitist_x;
+    Eigen::MatrixXd _elitist_y;
 
     std::mt19937_64 _engine;
+    Eigen::VectorXi _ranks;
+    Eigen::VectorXd _crowding_vol;
 
     Eigen::MatrixXd _mutation(double f, const Eigen::MatrixXd& parent);
     Eigen::MatrixXd _crossover(double cr, const Eigen::MatrixXd& parent, const Eigen::MatrixXd& mutated);
