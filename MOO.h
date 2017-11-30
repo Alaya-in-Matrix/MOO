@@ -18,6 +18,8 @@ protected:
     const Eigen::VectorXd _lb;
     const Eigen::VectorXd _ub;
 
+    Eigen::MatrixXd _anchor_x;
+    Eigen::MatrixXd _anchor_y;
     Eigen::MatrixXd _pop_x;
     Eigen::MatrixXd _pop_y;
     Eigen::MatrixXd _elitist_x;
@@ -52,6 +54,7 @@ public:
     void set_cr(double);
     void set_seed(size_t);
     void set_record(bool);
+    void set_anchor(const Eigen::MatrixXd&);
     size_t get_seed() const;
     void moo();
     Eigen::MatrixXd pareto_set() const;
@@ -59,6 +62,8 @@ public:
 
     Eigen::MatrixXd dbx() const;
     Eigen::MatrixXd dby() const;
+    Eigen::MatrixXd anchor_x() const { return _anchor_x; }
+    Eigen::MatrixXd anchor_y() const { return _anchor_y; }
     std::vector<size_t> nth_element(size_t) const;
     std::vector<size_t> sort() const;
     size_t best() const;

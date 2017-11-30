@@ -11,6 +11,8 @@ MOO::MOO(MOO::ObjF f, size_t no, const VectorXd& lb, const VectorXd& ub)
     _engine = mt19937_64(_seed);
     // _sampled_x = MatrixXd(_dim, 0);
     // _sampled_y = MatrixXd(_num_obj, 0);
+    _anchor_x  = MatrixXd(_dim, 0);
+    _anchor_y  = MatrixXd(_num_obj, 0);
     _elitist_x = MatrixXd(_dim, 0);
     _elitist_y = MatrixXd(_num_obj, 0);
 }
@@ -23,6 +25,12 @@ void MOO::set_seed(size_t seed)
 {
     _seed = seed;
     _engine.seed(_seed);
+}
+void MOO::set_anchor(const MatrixXd& x)
+{
+    assert((size_t)x.rows() == _dim);
+    _anchor_x = x;
+    _anchor_y = _run_func_batch(x);
 }
 size_t MOO::get_seed() const { return _seed; }
 void MOO::moo()
@@ -54,10 +62,10 @@ void MOO::moo()
         }
         MatrixXd extra_child_x = _slice_matrix(children_x, extra_child);
         MatrixXd extra_child_y = _slice_matrix(children_y, extra_child);
-        MatrixXd merged_x(_dim,     _np + extra_child_y.cols());
-        MatrixXd merged_y(_num_obj, _np + extra_child_y.cols());
-        merged_x << _pop_x, extra_child_x;
-        merged_y << _pop_y, extra_child_y;
+        MatrixXd merged_x(_dim,     _np + _anchor_x.cols() + extra_child_y.cols());
+        MatrixXd merged_y(_num_obj, _np + _anchor_x.cols() + extra_child_y.cols());
+        merged_x << _pop_x, _anchor_x, extra_child_x;
+        merged_y << _pop_y, _anchor_y, extra_child_y;
 
         _ranks        = _dom_rank(merged_y);
         _crowding_vol = _crowding_dist(merged_y, _ranks);
