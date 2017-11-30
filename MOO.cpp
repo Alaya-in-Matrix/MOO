@@ -36,14 +36,28 @@ void MOO::moo()
     _pop_y = _run_func_batch(_pop_x);
     for (size_t i = 0; i < _gen; ++i)
     {
-        const MatrixXd mutated    = _mutation(_f, _pop_x);
-        const MatrixXd children_x = _crossover(_cr, _pop_x, mutated);
-        const MatrixXd children_y = _run_func_batch(children_x);
+        MatrixXd mutated      = _mutation(_f, _pop_x);
+        MatrixXd children_x   = _crossover(_cr, _pop_x, mutated);
+        MatrixXd children_y   = _run_func_batch(children_x);
 
-        MatrixXd merged_x(_dim, 2 * _np);
-        MatrixXd merged_y(_num_obj, 2 * _np);
-        merged_x << _pop_x, children_x;
-        merged_y << _pop_y, children_y;
+        // Setting from DEMO: Differential Evolution for Multiobjective Optimization
+        vector<size_t> extra_child;
+        for(size_t j = 0; j < _np; ++j)
+        {
+            if(_dominate(children_y.col(j), _pop_y.col(j)))
+            {
+                _pop_x.col(j) = children_x.col(j);
+                _pop_y.col(j) = children_y.col(j);
+            }
+            else if(not _dominate(_pop_y.col(j), children_y.col(j)))
+                extra_child.push_back(j);
+        }
+        MatrixXd extra_child_x = _slice_matrix(children_x, extra_child);
+        MatrixXd extra_child_y = _slice_matrix(children_y, extra_child);
+        MatrixXd merged_x(_dim,     _np + extra_child_y.cols());
+        MatrixXd merged_y(_num_obj, _np + extra_child_y.cols());
+        merged_x << _pop_x, extra_child_x;
+        merged_y << _pop_y, extra_child_y;
 
         _ranks        = _dom_rank(merged_y);
         _crowding_vol = _crowding_dist(merged_y, _ranks);
@@ -78,14 +92,37 @@ MatrixXd MOO::pareto_front() const
 
 MatrixXd MOO::_mutation(double f, const MatrixXd& parent)
 {
-    const size_t np = parent.cols();
+    const size_t np  = parent.cols();
     MatrixXd mutated = parent;
     uniform_int_distribution<long> distr(0, np - 1);
     for (size_t i = 0; i < np; ++i)
     {
+        const size_t i0 = distr(_engine);
         const size_t i1 = distr(_engine);
         const size_t i2 = distr(_engine);
-        mutated.col(i) = parent.col(i) + f * (parent.col(i1) - parent.col(i2));
+        mutated.col(i)  = parent.col(i0) + f * (parent.col(i1) - parent.col(i2));
+        mutated.col(i)  = mutated.col(i).cwiseMax(_lb).cwiseMin(_ub);
+    }
+    return mutated;
+}
+
+Eigen::MatrixXd MOO::_polynomial_mutation(const Eigen::MatrixXd para, double rate, size_t idx)
+{
+    const size_t dim     = para.rows();
+    const size_t num_pnt = para.cols();
+    MatrixXd mutated     = para;
+    uniform_real_distribution<double> distr(0, 1);
+    for(size_t i = 0; i < num_pnt; ++i)
+    {
+        for(size_t j = 0; j < dim; ++j)
+        {
+            if(distr(_engine) <= rate)
+            {
+                const double r      = distr(_engine);
+                const double sigma  = r < 0.5 ? pow(2 * r, 1.0 / (idx + 1)) - 1 : 1 - pow(2 - 2 * r, 1.0 / (idx + 1));
+                mutated(j, i)      += sigma * (_ub(j) - _lb(j));
+            }
+        }
         mutated.col(i) = mutated.col(i).cwiseMax(_lb).cwiseMin(_ub);
     }
     return mutated;
@@ -300,3 +337,4 @@ vector<size_t> MOO::sort() const
     return indices;
 }
 size_t MOO::best() const { return sort().front(); }
+

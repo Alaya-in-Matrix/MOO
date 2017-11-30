@@ -29,6 +29,7 @@ protected:
 
     Eigen::MatrixXd _mutation(double f, const Eigen::MatrixXd& parent);
     Eigen::MatrixXd _crossover(double cr, const Eigen::MatrixXd& parent, const Eigen::MatrixXd& mutated);
+    Eigen::MatrixXd _polynomial_mutation(const Eigen::MatrixXd para, double rate, size_t idx);
     std::vector<size_t> _seq_index(size_t) const;
     Eigen::MatrixXd _slice_matrix(const Eigen::MatrixXd&, const std::vector<size_t>&) const;
     Eigen::VectorXd _run_func(const Eigen::VectorXd&); // wrapper of _func

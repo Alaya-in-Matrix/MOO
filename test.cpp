@@ -1,6 +1,7 @@
 #include "MOO.h"
 #include "Eigen/Dense"
 #include <iostream>
+#include <fstream>
 #include <cassert>
 #include <cmath>
 using namespace std;
@@ -67,6 +68,19 @@ VectorXd zdt4(const VectorXd& xs)
     objs << f1, f2;
     return objs;
 }
+
+VectorXd zdt6(const VectorXd& xs)
+{
+    assert(xs.size() > 1);
+    const size_t dim = xs.size();
+    VectorXd rest_xs = xs.tail(xs.size() - 1);
+    const double f1 = 1 - exp(-4 * xs(0)) * pow(sin(6 * M_PI * xs(0)), 6);
+    const double g  = 1 + 9 / (dim - 1) * rest_xs.sum();
+    const double f2 = g * (1 - pow(f1/g, 2));
+    VectorXd objs(2);
+    objs << f1, f2;
+    return objs;
+}
 int main()
 {
     VectorXd lb = VectorXd::Constant(10, 1, -5);
@@ -74,11 +88,15 @@ int main()
     lb(0) = 0;
     ub(0) = 1;
     MOO mo(zdt4, 2, lb, ub);
-    mo.set_f(0.8);
-    mo.set_gen(3000);
+    mo.set_f(0.5);
+    mo.set_cr(0.3);
+    mo.set_gen(250);
     mo.set_np(100);
-    mo.set_record(false);
+    mo.set_record(true);
     mo.moo();
-    cout << mo.pareto_front().transpose() << endl;
+    cout << "Finished" << endl;
+    ofstream pf("pf");
+    pf << mo.pareto_front().transpose() << endl;
+    pf.close();
     return EXIT_SUCCESS;
 }
