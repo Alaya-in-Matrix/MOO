@@ -172,6 +172,8 @@ vector<size_t> MOO::_seq_index(size_t n) const
 
 MatrixXd MOO::_slice_matrix(const MatrixXd& m, const vector<size_t>& indices) const
 {
+    if(indices.size() == 0)
+        return MatrixXd(m.rows(), 0);
     assert(*max_element(indices.begin(), indices.end()) < (size_t)m.cols());
     MatrixXd slice(m.rows(), indices.size());
     for (size_t i = 0; i < indices.size(); ++i) slice.col(i) = m.col(indices[i]);
