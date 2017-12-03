@@ -2,6 +2,7 @@
 #include <Eigen/Dense>
 #include <limits>
 #include <iostream>
+#include <unordered_set>
 using namespace std;
 using namespace Eigen;
 MOO::MOO(MOO::ObjF f, size_t no, const VectorXd& lb, const VectorXd& ub)
@@ -50,22 +51,29 @@ void MOO::moo()
 
         // Setting from DEMO: Differential Evolution for Multiobjective Optimization
         vector<size_t> extra_child;
+        vector<bool> is_child(_np);
         for(size_t j = 0; j < _np; ++j)
         {
             if(_dominate(children_y.col(j), _pop_y.col(j)))
             {
                 _pop_x.col(j) = children_x.col(j);
                 _pop_y.col(j) = children_y.col(j);
+                is_child[j]   = true;
             }
             else if(not _dominate(_pop_y.col(j), children_y.col(j)))
+            {
                 extra_child.push_back(j);
+                is_child.push_back(true);
+            }
         }
+        assert(is_child.size() == _pop_x.cols() + extra_child.size());
+
         MatrixXd extra_child_x = _slice_matrix(children_x, extra_child);
         MatrixXd extra_child_y = _slice_matrix(children_y, extra_child);
         MatrixXd merged_x(_dim,     _np + _anchor_x.cols() + extra_child_y.cols());
         MatrixXd merged_y(_num_obj, _np + _anchor_x.cols() + extra_child_y.cols());
-        merged_x << _pop_x, _anchor_x, extra_child_x;
-        merged_y << _pop_y, _anchor_y, extra_child_y;
+        merged_x << _pop_x, extra_child_x, _anchor_x;
+        merged_y << _pop_y, extra_child_y, _anchor_y;
 
         _ranks        = _dom_rank(merged_y);
         _crowding_vol = _crowding_dist(merged_y, _ranks);
@@ -75,15 +83,15 @@ void MOO::moo()
         if(_record_all)
         {
             vector<size_t> best_rank_indices;
-            for(size_t i = _np; i < 2 * _np; ++i)
+            for(long j = 0; j < _pop_x.cols() + extra_child_x.cols(); ++j)
             {
-                if(_ranks(i) == 0)
-                    best_rank_indices.push_back(i - _np);
+                if(_ranks(j) == 0 and is_child[j])
+                    best_rank_indices.push_back(j);
             }
             _elitist_x.conservativeResize(Eigen::NoChange, _elitist_x.cols() + best_rank_indices.size());
             _elitist_y.conservativeResize(Eigen::NoChange, _elitist_y.cols() + best_rank_indices.size());
-            _elitist_x.rightCols(best_rank_indices.size()) = _slice_matrix(children_x, best_rank_indices);
-            _elitist_y.rightCols(best_rank_indices.size()) = _slice_matrix(children_y, best_rank_indices);
+            _elitist_x.rightCols(best_rank_indices.size()) = _slice_matrix(merged_x, best_rank_indices);
+            _elitist_y.rightCols(best_rank_indices.size()) = _slice_matrix(merged_y, best_rank_indices);
         }
     }
 }
@@ -204,23 +212,82 @@ bool MOO::_dominate(const VectorXd& obj1, const VectorXd& obj2) const
 {
     return (obj1.array() <= obj2.array()).all() and obj1 != obj2;
 }
+vector<size_t> MOO::_extract_pf2(const Eigen::MatrixXd& pnts) const
+{
+    // special case for bi-objective, O(NlogN) complexity
+    vector<size_t> idxs = _seq_index(pnts.cols());
+    // sort points according to the first objective
+    std::sort(idxs.begin(), idxs.end(), [&](const size_t i1, size_t i2)->bool{
+        return pnts(0, i1) < pnts(0, i2);
+    });
+
+    vector<size_t> pf{idxs[0]};
+    size_t curr = idxs[0];
+    for(long i = 1; i < pnts.cols(); ++i)
+    {
+        if(pnts(1, idxs[i]) < pnts(1, curr))
+        {
+            curr = idxs[i];
+            pf.push_back(idxs[i]);
+        }
+    }
+    return pf;
+}
 vector<size_t> MOO::_extract_pf(const Eigen::MatrixXd& pnts) const
 {
-    vector<size_t> idxs;
-    for (long i = 0; i < pnts.cols(); ++i)
+    // Mishra, K. K., and Sandeep Harit. "A fast algorithm for finding the non
+    // dominated set in multi objective optimization." International Journal of
+    // Computer Applications 1.25 (2010): 35-39.
+    // XXX: The paper is poorly written!!!
+    if(pnts.rows() == 2)
+        return _extract_pf2(pnts);
+    vector<size_t> idxs = _seq_index(pnts.cols());
+
+    // sort points according to the first objective
+    std::sort(idxs.begin(), idxs.end(), [&](const size_t i1, size_t i2)->bool{
+        return pnts(0, i1) < pnts(0, i2);
+    });
+
+    unordered_set<size_t> s{idxs[0]};
+    for(size_t i = 1; i < idxs.size(); ++i)
     {
+        size_t o       = idxs[i];
         bool dominated = false;
-        for (long j = 0; j < pnts.cols(); ++j)
+        for(auto it = s.begin(); it != s.end();)
         {
-            if (_dominate(pnts.col(j), pnts.col(i)))
+            if(_dominate(pnts.col(o), pnts.col(*it)))
             {
-                dominated = true;
-                break;
+                it = s.erase(it);
+            }
+            else
+            {
+                if (_dominate(pnts.col(*it), pnts.col(o)))  // o is dominated
+                    dominated = true;
+                ++it;
             }
         }
-        if (not dominated) idxs.push_back(i);
+        if(not dominated)
+            s.insert(o);
     }
-    return idxs;
+    vector<size_t> ns;
+    std::copy(s.begin(), s.end(), std::back_inserter(ns));
+    return ns;
+
+    // vector<size_t> idxs;
+    // for (long i = 0; i < pnts.cols(); ++i)
+    // {
+    //     bool dominated = false;
+    //     for (long j = 0; j < pnts.cols(); ++j)
+    //     {
+    //         if (_dominate(pnts.col(j), pnts.col(i)))
+    //         {
+    //             dominated = true;
+    //             break;
+    //         }
+    //     }
+    //     if (not dominated) idxs.push_back(i);
+    // }
+    // return idxs;
 }
 
 VectorXi MOO::_dom_rank(const Eigen::MatrixXd& objs) const
@@ -345,4 +412,3 @@ vector<size_t> MOO::sort() const
     return indices;
 }
 size_t MOO::best() const { return sort().front(); }
-

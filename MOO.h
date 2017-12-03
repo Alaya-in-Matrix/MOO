@@ -40,6 +40,7 @@ protected:
 
     bool _dominate(const Eigen::VectorXd& obj1, const Eigen::VectorXd& obj2) const;
     std::vector<size_t> _extract_pf(const Eigen::MatrixXd&) const;
+    std::vector<size_t> _extract_pf2(const Eigen::MatrixXd&) const;
     Eigen::VectorXi _dom_rank(const Eigen::MatrixXd& objs) const;
     Eigen::VectorXd _crowding_dist(const Eigen::MatrixXd& objs, const Eigen::VectorXi& ranks) const;
     Eigen::VectorXd _front_crowding_dist(const Eigen::MatrixXd&) const;
