@@ -241,6 +241,12 @@ vector<size_t> MOO::_extract_pf(const Eigen::MatrixXd& pnts) const
     // dominated set in multi objective optimization." International Journal of
     // Computer Applications 1.25 (2010): 35-39.
     // XXX: The paper is poorly written!!!
+    if(pnts.rows() == 1)
+    {
+        size_t best_id;
+        pnts.row(0).minCoeff(&best_id);
+        return {best_id};
+    }
     if(pnts.rows() == 2)
         return _extract_pf2(pnts);
     vector<size_t> idxs = _seq_index(pnts.cols());
