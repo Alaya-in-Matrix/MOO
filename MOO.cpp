@@ -3,6 +3,7 @@
 #include <limits>
 #include <iostream>
 #include <unordered_set>
+#include <omp.h>
 using namespace std;
 using namespace Eigen;
 MOO::MOO(MOO::ObjF f, size_t no, const VectorXd& lb, const VectorXd& ub)
@@ -45,6 +46,9 @@ void MOO::moo()
     _pop_y = _run_func_batch(_pop_x);
     for (size_t i = 0; i < _gen; ++i)
     {
+#ifdef MYDEBUG
+        cout << "Gen: " << i << endl;
+#endif
         MatrixXd mutated      = _mutation(_f, _pop_x);
         MatrixXd children_x   = _crossover(_cr, _pop_x, mutated);
         MatrixXd children_y   = _run_func_batch(children_x);
@@ -195,7 +199,9 @@ Eigen::VectorXd MOO::_run_func(const Eigen::VectorXd& param)  // wrapper of _fun
 Eigen::MatrixXd MOO::_run_func_batch(const Eigen::MatrixXd& params)  // wrapper of _func
 {
     MatrixXd evaluated(_num_obj, params.cols());
-    for (long i = 0; i < params.cols(); ++i) evaluated.col(i) = _run_func(params.col(i));
+#pragma omp parallel for
+    for (long i = 0; i < params.cols(); ++i) 
+        evaluated.col(i) = _run_func(params.col(i));
     return evaluated;
 }
 MatrixXd MOO::_rand_matrix(const Eigen::VectorXd& lb, const Eigen::VectorXd& ub, size_t num_col)
