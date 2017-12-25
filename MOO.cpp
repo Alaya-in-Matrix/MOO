@@ -380,18 +380,21 @@ VectorXd MOO::_front_crowding_dist(const MatrixXd& front_objs) const
             else if (j == 0)
             {
                 const long next_idx = idxs[j + 1];
-                dists(idx) *= (obj_vals(next_idx) - obj_vals(idx));
+                // dists(idx) *= (obj_vals(next_idx) - obj_vals(idx));
+                dists(idx) = numeric_limits<double>::infinity();
             }
             else if (j == num_pnts - 1)
             {
                 const long prev_idx = idxs[j - 1];
-                dists(idx) *= (obj_vals(idx) - obj_vals(prev_idx));
+                // dists(idx) *= (obj_vals(idx) - obj_vals(prev_idx));
+                dists(idx) = numeric_limits<double>::infinity();
             }
             else
             {
                 const long prev_idx = idxs[j - 1];
                 const long next_idx = idxs[j + 1];
-                dists(idx) *= min(obj_vals(next_idx) - obj_vals(idx), obj_vals(idx) - obj_vals(prev_idx));
+                // dists(idx) *= min(obj_vals(next_idx) - obj_vals(idx), obj_vals(idx) - obj_vals(prev_idx));
+                dists(idx) *= obj_vals(next_idx) - obj_vals(prev_idx);
             }
         }
     }
