@@ -2,12 +2,11 @@
 
 ## About
 
-Multi-objective opitimization using a modified NSGA-II
+Multi-objective opitimization
 
-## Algorithm
+## DEMO
 
-- Using DE mutation and crossover instead of GA operations, just for the convenience of coding
-- Crowding volume instead of crowding distance
+See test.cpp
 
 ## Dependencies
 
