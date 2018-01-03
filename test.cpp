@@ -93,10 +93,15 @@ int main()
     mo.set_gen(250);
     mo.set_np(100);
     mo.set_record(true);
+    mo.set_crowding_space(MOO::CrowdingSpace::Input);
     mo.moo();
     cout << "Finished" << endl;
     ofstream pf("pf");
     pf << mo.pareto_front().transpose() << endl;
     pf.close();
+
+    ofstream ps("ps");
+    ps << mo.pareto_set().transpose() << endl;
+    ps.close();
     return EXIT_SUCCESS;
 }

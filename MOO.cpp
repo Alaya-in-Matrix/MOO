@@ -80,7 +80,7 @@ void MOO::moo()
         merged_y << _pop_y, extra_child_y, _anchor_y;
 
         _ranks        = _dom_rank(merged_y);
-        _crowding_vol = _crowding_dist(merged_y, _ranks);
+        _crowding_vol = _cs == Input ? _crowding_dist(merged_x, _ranks) : _crowding_dist(merged_y, _ranks);
         const vector<size_t> idxs = _nth_element(merged_y, _np);
         _pop_x = _slice_matrix(merged_x, idxs).leftCols(_np);
         _pop_y = _slice_matrix(merged_y, idxs).leftCols(_np);
@@ -379,21 +379,21 @@ VectorXd MOO::_front_crowding_dist(const MatrixXd& front_objs) const
                 dists(idx) = numeric_limits<double>::infinity();  // boundary points are always favored
             else if (j == 0)
             {
-                const long next_idx = idxs[j + 1];
+                // const long next_idx = idxs[j + 1];
                 // dists(idx) *= (obj_vals(next_idx) - obj_vals(idx));
                 dists(idx) = numeric_limits<double>::infinity();
             }
             else if (j == num_pnts - 1)
             {
-                const long prev_idx = idxs[j - 1];
+                // const long prev_idx = idxs[j - 1];
                 // dists(idx) *= (obj_vals(idx) - obj_vals(prev_idx));
                 dists(idx) = numeric_limits<double>::infinity();
             }
             else
             {
+                // dists(idx) *= min(obj_vals(next_idx) - obj_vals(idx), obj_vals(idx) - obj_vals(prev_idx));
                 const long prev_idx = idxs[j - 1];
                 const long next_idx = idxs[j + 1];
-                // dists(idx) *= min(obj_vals(next_idx) - obj_vals(idx), obj_vals(idx) - obj_vals(prev_idx));
                 dists(idx) *= obj_vals(next_idx) - obj_vals(prev_idx);
             }
         }
@@ -418,9 +418,10 @@ vector<size_t> MOO::nth_element(size_t n) const
 }
 vector<size_t> MOO::sort() const
 {
+    const MatrixXd& dbx = _record_all ? _elitist_x : _pop_x; 
     const MatrixXd& dby = _record_all ? _elitist_y : _pop_y; 
     const VectorXi ranks    = _dom_rank(dby);
-    const VectorXd crow_vol = _crowding_dist(dby, ranks);
+    const VectorXd crow_vol = _cs == Input ? _crowding_dist(dbx, ranks) : _crowding_dist(dby, ranks);
     vector<size_t> indices  = _seq_index(dby.cols());
     auto cmp = [&](const size_t i1, size_t i2) -> bool {
         return ranks(i1) < ranks(i2) or (ranks(i1) == ranks(i2) and crow_vol(i1) > crow_vol(i2));
