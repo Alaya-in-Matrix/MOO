@@ -83,18 +83,19 @@ VectorXd zdt6(const VectorXd& xs)
 }
 int main()
 {
-    VectorXd lb = VectorXd::Constant(10, 1, -5);
-    VectorXd ub = VectorXd::Constant(10, 1, 5);
+    VectorXd lb = VectorXd::Constant(10, 1, 0);
+    VectorXd ub = VectorXd::Constant(10, 1, 1);
     lb(0) = 0;
     ub(0) = 1;
-    MOO mo(zdt4, 2, lb, ub);
+    MOO mo(zdt6, 2, lb, ub);
     mo.set_f(0.5);
-    mo.set_cr(0.3);
+    mo.set_cr(1);
     mo.set_gen(250);
-    mo.set_np(100);
-    mo.set_record(true);
+    mo.set_moead_H(100);
+    mo.set_moead_delta(0.9);
+    mo.set_record(false);
     mo.set_crowding_space(MOO::CrowdingSpace::Input);
-    mo.moo();
+    mo.moead();
     cout << "Finished" << endl;
     ofstream pf("pf");
     pf << mo.pareto_front().transpose() << endl;

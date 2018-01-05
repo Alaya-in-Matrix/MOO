@@ -33,6 +33,7 @@ protected:
     CrowdingSpace   _cs;
 
     Eigen::MatrixXd _mutation(double f, const Eigen::MatrixXd& parent);
+    Eigen::VectorXd _mutation(double f, const Eigen::MatrixXd& parent, size_t r1, size_t r2, size_t r3) const;
     Eigen::MatrixXd _crossover(double cr, const Eigen::MatrixXd& parent, const Eigen::MatrixXd& mutated);
     Eigen::MatrixXd _polynomial_mutation(const Eigen::MatrixXd para, double rate, size_t idx);
     std::vector<size_t> _seq_index(size_t) const;
@@ -75,4 +76,30 @@ public:
 
 private:
     ObjF _func;
+
+// implementation of MOEA/D
+public:
+    void moead();
+    void moead_one_step();
+    void set_moead_H(size_t v){_H = v; }
+    void set_moead_T(size_t v){_T = v; }
+    void set_moead_nr(size_t v){_nr = v; }
+    void set_moead_delta(double v){_delta = v; }
+protected:
+    bool   _param_set = false;
+    size_t _H         = 80;     // determine number of weights
+    size_t _T         = 8;     // determine number of neighbours
+    size_t _nr        = 1;
+    double _delta     = 0.9;
+    size_t _N;     // number of weight vectors
+    Eigen::MatrixXi _B;
+    Eigen::VectorXd _ref_point;
+    Eigen::MatrixXd _lambdas; // weight vectors
+
+    Eigen::MatrixXd _gen_weights() const;
+    Eigen::MatrixXd _gen_weights(size_t num, size_t dim, double unit) const;
+    void _setB();
+    void _moead_initialize();
+    std::vector<size_t> _select_mating_pool(size_t i);
+    double _tchebysheff(const Eigen::VectorXd& obj_vals, const Eigen::VectorXd& weight) const;
 };

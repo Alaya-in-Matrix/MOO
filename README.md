@@ -4,6 +4,11 @@
 
 Multi-objective opitimization
 
+Algorithm:
+
+- MOEA/D-DE
+- DEMO: Differential Evolution for Multiobjective Optimization
+
 ## DEMO
 
 See test.cpp

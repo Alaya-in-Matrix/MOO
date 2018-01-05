@@ -32,7 +32,6 @@ void MOO::set_anchor(const MatrixXd& x)
 {
     assert((size_t)x.rows() == _dim);
     _anchor_x = x;
-    _anchor_y = _run_func_batch(x);
 }
 size_t MOO::get_seed() const { return _seed; }
 void MOO::moo()
@@ -43,6 +42,8 @@ void MOO::moo()
     //     _sampled_y = MatrixXd::Zero(_num_obj, _np * (1+_gen));
     // }
     _pop_x = _rand_matrix(_lb, _ub, _np);
+    if(_np > (size_t)_anchor_x.cols() and _anchor_x.cols() > 0)
+        _pop_x.leftCols(_anchor_x.cols()) = _anchor_x;
     _pop_y = _run_func_batch(_pop_x);
     for (size_t i = 0; i < _gen; ++i)
     {
@@ -74,10 +75,10 @@ void MOO::moo()
 
         MatrixXd extra_child_x = _slice_matrix(children_x, extra_child);
         MatrixXd extra_child_y = _slice_matrix(children_y, extra_child);
-        MatrixXd merged_x(_dim,     _np + _anchor_x.cols() + extra_child_y.cols());
-        MatrixXd merged_y(_num_obj, _np + _anchor_x.cols() + extra_child_y.cols());
-        merged_x << _pop_x, extra_child_x, _anchor_x;
-        merged_y << _pop_y, extra_child_y, _anchor_y;
+        MatrixXd merged_x(_dim,     _np +  extra_child_y.cols());
+        MatrixXd merged_y(_num_obj, _np +  extra_child_y.cols());
+        merged_x << _pop_x, extra_child_x;
+        merged_y << _pop_y, extra_child_y;
 
         _ranks        = _dom_rank(merged_y);
         _crowding_vol = _cs == Input ? _crowding_dist(merged_x, _ranks) : _crowding_dist(merged_y, _ranks);
@@ -116,14 +117,12 @@ MatrixXd MOO::_mutation(double f, const MatrixXd& parent)
     MatrixXd mutated = parent;
     uniform_int_distribution<long> distr(0, np - 1);
     for (size_t i = 0; i < np; ++i)
-    {
-        const size_t i0 = distr(_engine);
-        const size_t i1 = distr(_engine);
-        const size_t i2 = distr(_engine);
-        mutated.col(i)  = parent.col(i0) + f * (parent.col(i1) - parent.col(i2));
-        mutated.col(i)  = mutated.col(i).cwiseMax(_lb).cwiseMin(_ub);
-    }
+        mutated.col(i)  = _mutation(f, parent, distr(_engine), distr(_engine), distr(_engine));
     return mutated;
+}
+VectorXd MOO::_mutation(double f, const MatrixXd& parent, size_t r1, size_t r2, size_t r3) const
+{
+    return (parent.col(r1) + f * (parent.col(r2) - parent.col(r3))).cwiseMax(_lb).cwiseMin(_ub);
 }
 
 Eigen::MatrixXd MOO::_polynomial_mutation(const Eigen::MatrixXd para, double rate, size_t idx)
@@ -430,3 +429,166 @@ vector<size_t> MOO::sort() const
     return indices;
 }
 size_t MOO::best() const { return sort().front(); }
+
+MatrixXd MOO::_gen_weights(size_t num, size_t dim, double unit) const
+{
+    if(dim == 1)
+    {
+        // vector<double> weights;
+        RowVectorXd weights(num);
+        for(size_t i = 0; i < num; ++i)
+            weights(i) = i * unit;
+        return weights;
+    }
+    else
+    {
+        RowVectorXd top = _gen_weights(num, 1, unit);
+        MatrixXd weights(dim, 0);
+        for(long i = 0; i < top.size(); ++i)
+        {
+            MatrixXd sub_weights = _gen_weights(num - i, dim - 1, unit);
+            MatrixXd tmp_weights(dim, sub_weights.cols());
+            tmp_weights << RowVectorXd::Constant(1, sub_weights.cols(), top(i)), sub_weights;
+            weights.conservativeResize(Eigen::NoChange, weights.cols() + tmp_weights.cols());
+            weights.rightCols(tmp_weights.cols()) = tmp_weights;
+        }
+        return weights;
+    }
+}
+MatrixXd MOO::_gen_weights() const
+{
+    const double unit = 1.0 / _H;
+    MatrixXd sub_weight = _gen_weights(_H + 1, _num_obj - 1, unit);
+    MatrixXd weights = MatrixXd::Zero(_num_obj, sub_weight.cols());
+    weights.topRows(_num_obj - 1) = sub_weight;
+    for(long i = 0; i < weights.cols(); ++i)
+        weights(_num_obj - 1, i) = 1.0 - weights.col(i).sum();
+    return weights;
+}
+void MOO::_setB()
+{
+    assert(_param_set);
+    assert(_np == _N);
+    _B = MatrixXi(_T, _N);
+    for(size_t i = 0; i < _N; ++i)
+    {
+        VectorXd dists(_N);
+        for(size_t j = 0; j < _N; ++j)
+            dists[j] = j == i ? numeric_limits<double>::infinity() : (_lambdas.col(i) - _lambdas.col(j)).norm();
+        vector<size_t> idxs = _seq_index(_N);
+        std::nth_element(idxs.begin(), idxs.begin() + _T, idxs.end(), [&](size_t i1, size_t i2)->bool{
+            return dists[i1] < dists[i2];
+        });
+        for(size_t j = 0; j < _T; ++j)
+            _B(j, i) = idxs[j];
+    }
+}
+void MOO::_moead_initialize()
+{
+    _lambdas   = _gen_weights();
+    _N         = _lambdas.cols();
+    _np        = _N;
+    _pop_x     = _rand_matrix(_lb, _ub, _np);
+    cout << "Reset NP to " << _np << endl;
+    if(_np > (size_t)_anchor_x.cols() and _anchor_x.cols() > 0)
+        _pop_x.leftCols(_anchor_x.cols()) = _anchor_x;
+    _pop_y     = _run_func_batch(_pop_x);
+    _ref_point = _pop_y.rowwise().minCoeff();
+    _param_set = true;
+    _setB();
+}
+vector<size_t> MOO::_select_mating_pool(size_t idx)
+{
+    const double r = uniform_real_distribution<double>(0, 1)(_engine);
+    vector<size_t> pool;
+    if(r < _delta)
+    {
+        VectorXi poolB = _B.col(idx);
+        for(size_t i = 0; i < _T; ++i)
+            pool.push_back(poolB(i));
+    }
+    else
+        pool = _seq_index(_N);
+    return pool;
+}
+double MOO::_tchebysheff(const VectorXd& obj_vals, const VectorXd& weight) const
+{
+    assert(obj_vals.size() == (long)_num_obj);
+    assert(weight.size()   == (long)_num_obj);
+    assert(weight.minCoeff() >= 0);
+    assert(weight.maxCoeff() <= 1);
+    VectorXd weighted(obj_vals.size());
+    for(size_t i = 0; i < _num_obj; ++i)
+        weighted(i) = weight(i) * abs(obj_vals(i) - _ref_point(i));
+    return weighted.maxCoeff();
+}
+void MOO::moead_one_step()
+{
+    for(size_t i = 0; i < _N; ++i)
+    {
+        cout << "\t" << i << endl;
+        // step 2.1 selection of the mating pool
+        const vector<size_t> pool = _select_mating_pool(i);
+
+        // step 2.2 reproduction and step 2.3 repair
+        // XXX: The authored only mentioned the "DE mutation", but I think it should be "DE mutation and crossover" operations, 
+        // as the CR is also listed as one of the algorithm parameter
+        uniform_int_distribution<size_t> distr(0, pool.size() - 1);
+        VectorXd de_operated = _crossover(_cr, _pop_x.col(i), _mutation(_f, _pop_x, i, pool[distr(_engine)], pool[distr(_engine)]));
+        VectorXd mutated     = _polynomial_mutation(de_operated, 1.0 / _dim, 20);
+        
+
+        // step 2.4, evaluate the new candidate
+        VectorXd evaluated_y  = _run_func(mutated);
+        if(_record_all)
+        {
+            _elitist_x.conservativeResize(Eigen::NoChange, _elitist_x.cols() + 1);
+            _elitist_y.conservativeResize(Eigen::NoChange, _elitist_y.cols() + 1);
+            _elitist_x.rightCols(1) = mutated;
+            _elitist_y.rightCols(1) = evaluated_y;
+        }
+
+        // step 2.5, update reference point, XXX: even if the values are
+        // evaluated via GP prediction, they are still used to update the
+        // reference point
+        _ref_point = _ref_point.cwiseMin(evaluated_y);
+
+
+        // step 2.6 replace of solutions
+        vector<size_t> better_idxs;
+        for(size_t j = 0; j < pool.size(); ++j)
+        {
+            size_t index = pool[j];
+            double old_te_val = _tchebysheff(_pop_y.col(index), _lambdas.col(index));
+            double new_te_val = _tchebysheff(evaluated_y, _lambdas.col(index));
+            if(new_te_val < old_te_val)
+                better_idxs.push_back(index);
+        }
+        if(better_idxs.size() > _nr)
+        {
+            std::sort(better_idxs.begin(), better_idxs.end(), [&](size_t i1, size_t i2)->bool{
+                const double dist1 = (_pop_y.col(i1) - evaluated_y).norm();
+                const double dist2 = (_pop_y.col(i2) - evaluated_y).norm();
+                return dist1 < dist2;
+            });
+        }
+        size_t num_to_replace = min(_nr, better_idxs.size());
+        for(size_t j = 0; j < num_to_replace; ++j)
+        {
+            const size_t replace_idx = better_idxs[j];
+            _pop_x.col(replace_idx)  = mutated;
+            _pop_y.col(replace_idx)  = evaluated_y;
+        }
+    }
+}
+void MOO::moead()
+{
+    _moead_initialize();
+    for(size_t i = 0; i < _gen; ++i)
+    {
+#ifdef MYDEBUG
+        cout << "Gen: " << i << endl;
+#endif
+        moead_one_step();
+    }
+}
