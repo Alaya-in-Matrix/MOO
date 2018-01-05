@@ -526,7 +526,6 @@ void MOO::moead_one_step()
 {
     for(size_t i = 0; i < _N; ++i)
     {
-        cout << "\t" << i << endl;
         // step 2.1 selection of the mating pool
         const vector<size_t> pool = _select_mating_pool(i);
 
